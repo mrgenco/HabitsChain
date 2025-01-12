@@ -12,7 +12,9 @@ struct CalendarView: View {
     var body: some View {
         VStack {
             monthHeader
+            Divider()
             daysHeader
+            Divider()
             daysGrid
         }
         .padding()
@@ -25,6 +27,7 @@ struct CalendarView: View {
             }
             
             Spacer()
+            
             
             Text(monthYearString(from: selectedMonth))
                 .font(.headline)
@@ -51,7 +54,7 @@ struct CalendarView: View {
         let days = daysInMonth()
         
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7)) {
-            ForEach(days, id: \.self) { date in
+            ForEach(Array(days.enumerated()), id: \.offset) { index, date in
                 if let date = date {
                     DayCell(
                         date: date,

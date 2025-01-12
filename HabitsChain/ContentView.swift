@@ -1,21 +1,13 @@
-//
-//  ContentView.swift
-//  HabitsChain
-//
-//  Created by Mehmet Rasid Gencosmanoglu on 30.12.2024.
-//
-
 import SwiftUI
 
 struct ContentView: View {
-    @State private var habitStore = HabitStore()
+    @StateObject private var habitStore = HabitStore()
     @State private var showingAddHabit = false
-    @State private var habitToEdit: Habit?
+    @State private var selectedHabit: Habit?
     @State private var selectedTab = 0
-    @State private var habitToShowCalendar: Habit?
-    @State private var habitToShowReminder: Habit?
     
     init() {
+        // If you have NotificationManager, call it here
         NotificationManager.shared.requestAuthorization()
     }
     
@@ -33,9 +25,9 @@ struct ContentView: View {
                 DashboardView(habits: habitStore.habits)
                     .navigationTitle("Dashboard")
                     .toolbar {
-                        Button(action: {
+                        Button {
                             showingAddHabit = true
-                        }) {
+                        } label: {
                             Image(systemName: "plus")
                         }
                     }
@@ -46,12 +38,16 @@ struct ContentView: View {
             .tag(1)
         }
         .sheet(isPresented: $showingAddHabit) {
-            AddHabitView(habits: $habitStore.habits)
+            AddHabitView { habit in
+                habitStore.habits.append(habit)
+                habitStore.save()
+            }
         }
-        .sheet(item: $habitToEdit) { habit in
-            EditHabitView(habit: habit) { updatedHabit in
+        .sheet(item: $selectedHabit) { habit in
+            HabitDetailView(habit: habit) { updatedHabit in
                 if let index = habitStore.habits.firstIndex(where: { $0.id == updatedHabit.id }) {
                     habitStore.habits[index] = updatedHabit
+                    habitStore.save()
                 }
             }
         }
@@ -65,131 +61,75 @@ struct ContentView: View {
                     onUpdate: { updatedHabit in
                         if let index = habitStore.habits.firstIndex(where: { $0.id == updatedHabit.id }) {
                             habitStore.habits[index] = updatedHabit
+                            habitStore.save()
                         }
                     },
-                    onCalendarTap: {
-                        habitToShowCalendar = habit
-                    },
-                    onReminderTap: {
-                        habitToShowReminder = habit
+                    onTap: {
+                        selectedHabit = habit
                     }
                 )
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        if let index = habitStore.habits.firstIndex(where: { $0.id == habit.id }) {
-                            habitStore.habits.remove(at: index)
-                        }
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                    
-                    Button {
-                        habitToEdit = habit
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    .tint(.blue)
-                }
+            }
+            .onDelete { indexSet in
+                habitStore.habits.remove(atOffsets: indexSet)
+                habitStore.save()
             }
         }
         .navigationTitle("My Habits")
         .toolbar {
-            Button(action: {
+            Button {
                 showingAddHabit = true
-            }) {
+            } label: {
                 Image(systemName: "plus")
-            }
-        }
-        .sheet(item: $habitToShowCalendar) { habit in
-            NavigationView {
-                CalendarView(habit: habit) { updatedHabit in
-                    if let index = habitStore.habits.firstIndex(where: { $0.id == updatedHabit.id }) {
-                        habitStore.habits[index] = updatedHabit
-                    }
-                }
-                .navigationTitle(habit.name)
-                .navigationBarItems(trailing: Button("Done") {
-                    habitToShowCalendar = nil
-                })
-            }
-        }
-        .sheet(item: $habitToShowReminder) { habit in
-            ReminderSettingsView(habit: habit) { updatedHabit in
-                if let index = habitStore.habits.firstIndex(where: { $0.id == updatedHabit.id }) {
-                    habitStore.habits[index] = updatedHabit
-                }
             }
         }
     }
 }
 
+// Example row view
 struct HabitRowView: View {
     let habit: Habit
     let onUpdate: (Habit) -> Void
-    let onCalendarTap: () -> Void
-    let onReminderTap: () -> Void
-    
-    @State private var isExpanded = false
+    let onTap: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(habit.name)
-                        .font(.headline)
-                    HStack {
-                        Text("Current streak: \(habit.currentStreak) days")
-                            .font(.subheadline)
-                        Spacer()
-                        Text("Best: \(habit.longestStreak) days")
-                            .font(.subheadline)
-                    }
-                    .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                Button(action: { withAnimation { isExpanded.toggle() } }) {
-                    Image(systemName: "chevron.down")
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                }
-            }
-            
-            if isExpanded {
-                HStack(spacing: 12) {
-                    Button(action: onCalendarTap) {
+        Button {
+            onTap()
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(habit.name)
+                            .font(.headline)
                         HStack {
-                            Image(systemName: "calendar")
-                            Text("Calendar")
+                            Text("Current streak: \(habit.currentStreak) days")
+                                .font(.subheadline)
+                            Spacer()
+                            Text("Best: \(habit.longestStreak) days")
+                                .font(.subheadline)
                         }
-                        .foregroundColor(.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
+                        .foregroundColor(.secondary)
                     }
                     
-                    Button(action: onReminderTap) {
-                        HStack {
-                            Image(systemName: "bell")
-                            Text("Reminder")
-                        }
-                        .foregroundColor(.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
+                    Spacer()
+                    
+                    if isCompletedToday {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .imageScale(.large)
                     }
+                    
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.gray)
                 }
-                .padding(.top, 8)
             }
+            .padding(.vertical, 12)
+            .background(isCompletedToday ? Color.green.opacity(0.1) : Color.clear)
         }
-        .padding(.vertical, 8)
-        .swipeActions(edge: .leading) {
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button {
                 toggleCompletion()
             } label: {
-                Label(isCompletedToday ? "Uncomplete" : "Complete", 
+                Label(isCompletedToday ? "Uncomplete" : "Complete",
                       systemImage: isCompletedToday ? "xmark.circle" : "checkmark.circle")
             }
             .tint(isCompletedToday ? .red : .green)
@@ -210,11 +150,10 @@ struct HabitRowView: View {
         let today = calendar.startOfDay(for: Date())
         
         if isCompletedToday {
-            let datesToRemove = updatedHabit.completedDates.filter { date in
-                calendar.isDate(date, inSameDayAs: today)
-            }
-            datesToRemove.forEach { updatedHabit.completedDates.remove($0) }
+            // Remove today's date from the completed dates
+            updatedHabit.completedDates = updatedHabit.completedDates.filter { !calendar.isDate($0, inSameDayAs: today) }
         } else {
+            // Insert today's date if it's not completed yet
             updatedHabit.completedDates.insert(today)
         }
         
@@ -222,6 +161,10 @@ struct HabitRowView: View {
     }
 }
 
-#Preview {
-    ContentView()
+// MARK: - Preview
+
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+    }
 }

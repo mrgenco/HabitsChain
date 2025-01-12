@@ -35,9 +35,7 @@ struct Habit: Identifiable, Codable {
                 calendar.isDate(date, inSameDayAs: currentDate)
             }
             
-            if !isCompleted {
-                break
-            }
+            if !isCompleted { break }
             
             streak += 1
             guard let previousDay = calendar.date(byAdding: .day, value: -1, to: currentDate) else { break }
@@ -72,11 +70,14 @@ struct Habit: Identifiable, Codable {
         return max(longestStreak, currentStreak)
     }
     
+    // MARK: - Codable
+    
     enum CodingKeys: String, CodingKey {
         case id
         case name
         case createdDate
         case completedDates
+        case reminder
     }
     
     init(from decoder: Decoder) throws {
@@ -84,8 +85,11 @@ struct Habit: Identifiable, Codable {
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         createdDate = try container.decode(Date.self, forKey: .createdDate)
+        
         let dateArray = try container.decode([Date].self, forKey: .completedDates)
         completedDates = Set(dateArray)
+        
+        reminder = try container.decodeIfPresent(HabitReminder.self, forKey: .reminder)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -94,6 +98,7 @@ struct Habit: Identifiable, Codable {
         try container.encode(name, forKey: .name)
         try container.encode(createdDate, forKey: .createdDate)
         try container.encode(Array(completedDates), forKey: .completedDates)
+        try container.encode(reminder, forKey: .reminder)
     }
 }
 
@@ -107,4 +112,4 @@ struct HabitReminder: Codable, Equatable {
         self.isEnabled = isEnabled
         self.weekdays = weekdays
     }
-} 
+}
